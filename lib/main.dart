@@ -39,6 +39,9 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
 
   List<Map<String, dynamic>> _transactions = [];
 
+  // Ky variabël përzgjedh se çfarë tipi do shfaqim në grafik (Income ose Expense)
+  String _chartType = 'Income';
+
   double get totalIncome => _transactions
       .where((item) => item['type'] == 'Income')
       .fold(0.0, (sum, item) => sum + item['amount']);
@@ -74,19 +77,6 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
     });
   }
 
-  Map<int, Map<String, double>> _groupTransactionsByMonth() {
-    Map<int, Map<String, double>> data = {};
-    for (var tx in _transactions) {
-      DateTime date = tx['date'];
-      int month = date.month;
-      if (!data.containsKey(month)) {
-        data[month] = {'Income': 0.0, 'Expense': 0.0};
-      }
-      data[month]![tx['type']] = data[month]![tx['type']]! + tx['amount'];
-    }
-    return data;
-  }
-
   @override
   Widget build(BuildContext context) {
     List<Widget> _pages = [
@@ -114,7 +104,7 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
                   "Të ardhurat: €${totalIncome.toStringAsFixed(2)}",
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
-                const SizedBox(width: 16), // Space between the texts
+                const SizedBox(width: 16),
                 Text(
                   "Shpenzimet: €${totalExpenses.toStringAsFixed(2)}",
                   style: const TextStyle(fontWeight: FontWeight.w500),
@@ -132,8 +122,6 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
               decoration: const InputDecoration(labelText: 'Përshkrimi'),
             ),
             const SizedBox(height: 10),
-
-            // DropDown per llojin dhe kategorine ne te njejtin rresht
             Row(
               children: [
                 Expanded(
@@ -178,7 +166,6 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
                 ),
               ],
             ),
-
             const SizedBox(height: 10),
             ElevatedButton(
               onPressed: _addTransaction,
@@ -188,10 +175,39 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
         ),
       ),
 
-      // Business Tab - Pie Chart
-      Padding(padding: const EdgeInsets.all(16.0), child: _buildPieChart()),
+      // Pie Chart Tab me toggle për Income/Expense
+      Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            ToggleButtons(
+              isSelected: [_chartType == 'Income', _chartType == 'Expense'],
+              onPressed: (int index) {
+                setState(() {
+                  _chartType = index == 0 ? 'Income' : 'Expense';
+                });
+              },
+              borderRadius: BorderRadius.circular(8),
+              selectedColor: Colors.white,
+              fillColor: const Color.fromARGB(255, 11, 160, 171),
+              children: const [
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('Të ardhurat'),
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 16),
+                  child: Text('Shpenzimet'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Expanded(child: _buildPieChartByType(_chartType)),
+          ],
+        ),
+      ),
 
-      // School Tab - Lista e transaksioneve
+      // Transaction List Tab
       Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -204,7 +220,7 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
                   "Të ardhurat: €${totalIncome.toStringAsFixed(2)}",
                   style: const TextStyle(fontWeight: FontWeight.w500),
                 ),
-                const SizedBox(width: 16), // Space between the texts
+                const SizedBox(width: 16),
                 Text(
                   "Shpenzimet: €${totalExpenses.toStringAsFixed(2)}",
                   style: const TextStyle(fontWeight: FontWeight.w500),
@@ -222,8 +238,19 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
                 children:
                     _transactions.map((tx) {
                       return ListTile(
+                        leading: Icon(
+                          tx['type'] == 'Income'
+                              ? Icons.arrow_downward
+                              : Icons.arrow_upward,
+                          color:
+                              tx['type'] == 'Income'
+                                  ? Colors.green
+                                  : Colors.red,
+                        ),
                         title: Text("${tx['description']} - €${tx['amount']}"),
-                        subtitle: Text('${tx['type']} (${tx['category']})'),
+                        subtitle: Text(
+                          '${tx['type']} (${tx['category']}) - ${tx['date'].day}/${tx['date'].month}/${tx['date'].year}',
+                        ),
                       );
                     }).toList(),
               ),
@@ -255,68 +282,173 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
     );
   }
 
-  Widget _buildPieChart() {
-    double totalIncome = 0;
-    double totalExpense = 0;
+  Widget _buildPieChartByType(String type) {
+    // Filtrimi i të dhënave sipas tipit (Income/Expense)
+    Map<String, double> categoryData = {};
 
     for (var tx in _transactions) {
-      if (tx['type'] == 'Income') {
-        totalIncome += tx['amount'];
-      } else {
-        totalExpense += tx['amount'];
+      if (tx['type'] == type) {
+        String category = tx['category'];
+        categoryData[category] = (categoryData[category] ?? 0) + tx['amount'];
       }
     }
 
-    if (totalIncome == 0 && totalExpense == 0) {
-      return const Center(child: Text('Nuk ka të dhëna për grafik.'));
+    if (categoryData.isEmpty) {
+      return Center(child: Text('Nuk ka të dhëna për $type.'));
     }
 
-    final List<PieChartSectionData> sections = [
-      if (totalIncome > 0)
-        PieChartSectionData(
-          color: const Color.fromARGB(255, 5, 124, 145),
-          value: totalIncome,
-          title: 'Fitim\n€${totalIncome.toStringAsFixed(2)}',
-          radius: 80,
-          titleStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-      if (totalExpense > 0)
-        PieChartSectionData(
-          color: const Color.fromARGB(255, 82, 249, 252),
-          value: totalExpense,
-          title: 'Shpenzim\n€${totalExpense.toStringAsFixed(2)}',
-          radius: 80,
-          titleStyle: const TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
+    // Ngjyrat për kategori në grafik
+    final colors = [
+      Colors.blue.shade400,
+      Colors.green.shade400,
+      const Color.fromARGB(255, 255, 38, 96),
+      Colors.red.shade400,
+      Colors.purple.shade400,
+      Colors.teal.shade400,
     ];
 
-    return PieChart(
-      PieChartData(
-        sections: sections,
-        sectionsSpace: 4,
-        centerSpaceRadius: 40,
-        borderData: FlBorderData(show: false),
+    // Ndërtimi i seksioneve për grafik
+    final List<PieChartSectionData> sections = [];
+    int colorIndex = 0;
+    categoryData.forEach((category, amount) {
+      final color = colors[colorIndex % colors.length];
+      sections.add(
+        PieChartSectionData(
+          color: color,
+          value: amount,
+          title: category,
+          radius: 80,
+          titleStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+      );
+      colorIndex++;
+    });
+
+    // Përmbledhje e të ardhurave dhe shpenzimeve sipas kategorive për gjithë transaksionet
+    Map<String, double> incomeByCategory = {};
+    Map<String, double> expenseByCategory = {};
+
+    for (var tx in _transactions) {
+      String category = tx['category'];
+      double amount = tx['amount'];
+
+      if (tx['type'] == 'Income') {
+        incomeByCategory[category] = (incomeByCategory[category] ?? 0) + amount;
+      } else {
+        expenseByCategory[category] =
+            (expenseByCategory[category] ?? 0) + amount;
+      }
+    }
+
+    // Filtrimi i transaksioneve për historikun sipas tipit të zgjedhur
+    List filteredTransactions =
+        _transactions.where((tx) => tx['type'] == type).toList();
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 250,
+            child: PieChart(
+              PieChartData(
+                sections: sections,
+                sectionsSpace: 4,
+                centerSpaceRadius: 40,
+                borderData: FlBorderData(show: false),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Historiku sipas Kategorisë:',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          filteredTransactions.isEmpty
+              ? const Text("Nuk ka transaksione për të shfaqur.")
+              : Column(
+                children:
+                    filteredTransactions.map((tx) {
+                      return ListTile(
+                        leading: Icon(
+                          _getCategoryIcon(tx['category']),
+                          color: Colors.blueGrey,
+                        ),
+                        title: Text(
+                          "${tx['category']} - €${tx['amount'].toStringAsFixed(2)}",
+                        ),
+                        subtitle: Text("${tx['description']} (${tx['type']})"),
+                        trailing: Text(
+                          "${tx['date'].day}/${tx['date'].month}/${tx['date'].year}",
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      );
+                    }).toList(),
+              ),
+          const Divider(height: 30),
+          const Text(
+            'Përmbledhje sipas Kategorisë:',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Të ardhurat:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          ...incomeByCategory.entries.map(
+            (entry) => Row(
+              children: [
+                Icon(_getCategoryIcon(entry.key), color: Colors.green),
+                const SizedBox(width: 8),
+                Text(
+                  "${entry.key}: €${entry.value.toStringAsFixed(2)}",
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Shpenzimet:',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          ...expenseByCategory.entries.map(
+            (entry) => Row(
+              children: [
+                Icon(_getCategoryIcon(entry.key), color: Colors.red),
+                const SizedBox(width: 8),
+                Text(
+                  "${entry.key}: €${entry.value.toStringAsFixed(2)}",
+                  style: const TextStyle(fontSize: 14),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  double _getMaxY(Map<int, Map<String, double>> data) {
-    double maxY = 0;
-    data.forEach((month, values) {
-      double sum =
-          values['Income']! > values['Expense']!
-              ? values['Income']!
-              : values['Expense']!;
-      if (sum > maxY) maxY = sum;
-    });
-    return maxY + 10;
+  // Funksioni për të marrë ikonën sipas kategorisë
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Shkolle':
+        return Icons.school;
+      case 'Argetim':
+        return Icons.movie;
+      case 'Ushqim':
+        return Icons.fastfood;
+      case 'Transport':
+        return Icons.directions_car;
+      case 'Tjera':
+        return Icons.category;
+      default:
+        return Icons.help_outline;
+    }
   }
 }
