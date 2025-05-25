@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
-import './splash_screen.dart';
-import './main.dart';
 
 void main() {
   runApp(const MyApp());
@@ -21,7 +19,7 @@ class MyApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const SplashScreen(),
+      home: const BudgetHomePage(),
     );
   }
 }
@@ -36,12 +34,17 @@ class BudgetHomePage extends StatefulWidget {
 class _BudgetHomePageState extends State<BudgetHomePage> {
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _budgetController = TextEditingController();
+
   String _selectedType = 'Income';
   String _selectedCategory = 'Kategoria';
 
   final List<Map<String, dynamic>> _transactions = [];
 
-  // Ky variabël përzgjedh se çfarë tipi do shfaqim në grafik (Income ose Expense)
+  // Variabla për buxhetin e kursimit
+  double _savingBudget = 0.0;
+
+  // Përzgjedh tipin për grafik
   String _chartType = 'Income';
 
   double get totalIncome => _transactions
@@ -71,6 +74,23 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
     }
   }
 
+  void _setSavingBudget() {
+    final double? budget = double.tryParse(_budgetController.text);
+    if (budget != null && budget >= 0) {
+      setState(() {
+        _savingBudget = budget;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Buxheti i kursimit u vendos në €${budget.toStringAsFixed(2)}',
+          ),
+        ),
+      );
+      _budgetController.clear();
+    }
+  }
+
   int _selectedIndex = 0;
 
   void _onItemTapped(int index) {
@@ -89,12 +109,18 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
           children: [
             Center(child: Image.asset('images/savings.png', height: 80)),
             const SizedBox(height: 16),
+
+            // Bilanci me ngjyrë të kuqe nëse shpenzimet kalojnë buxhetin
             Center(
               child: Text(
                 "Bilanci: €${balance.toStringAsFixed(2)}",
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
+                  color:
+                      totalExpenses > _savingBudget && _savingBudget > 0
+                          ? Colors.red
+                          : Colors.black,
                 ),
               ),
             ),
@@ -109,12 +135,37 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
                 const SizedBox(width: 16),
                 Text(
                   "Shpenzimet: €${totalExpenses.toStringAsFixed(2)}",
-                  style: const TextStyle(fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w500,
+                    color:
+                        totalExpenses > _savingBudget && _savingBudget > 0
+                            ? Colors.red
+                            : Colors.black,
+                  ),
                 ),
               ],
             ),
+
+            const SizedBox(height: 20),
+
+            // Shtimi i inputit dhe butonit për vendosjen e buxhetit të kursimit
+            TextField(
+              controller: _budgetController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Vendos Buxhetin e Kursimit (€)',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: _setSavingBudget,
+              child: const Text('Ruaj Buxhetin'),
+            ),
+
             const Divider(height: 30),
 
+            // Shtimi i transaksioneve
             TextField(
               controller: _amountController,
               keyboardType: TextInputType.number,
@@ -232,7 +283,6 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
             ),
             const SizedBox(height: 16),
 
-            // 👇 Piggy Bank Image
             Center(child: Image.asset('images/piggy_bank.png', height: 80)),
 
             const SizedBox(height: 16),
@@ -258,7 +308,7 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
                         ),
                         title: Text("${tx['description']} - €${tx['amount']}"),
                         subtitle: Text(
-                          '${tx['type']} (${tx['category']}) - ${tx['date'].day}/${tx['date'].month}/${tx['date'].year}',
+                          "${tx['category']} - ${tx['date'].toString().substring(0, 10)}",
                         ),
                       );
                     }).toList(),
@@ -273,153 +323,86 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
       appBar: AppBar(title: const Text('Kalkulatori i Buxhetit Personal')),
       body: pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
-        items: const <BottomNavigationBarItem>[
+        currentIndex: _selectedIndex,
+        selectedItemColor: const Color.fromARGB(255, 4, 89, 8),
+        onTap: _onItemTapped,
+        items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
           BottomNavigationBarItem(
             icon: Icon(Icons.pie_chart),
-            label: 'Analiza',
+            label: 'Grafiku',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.list_alt),
-            label: 'Transaksione',
+            icon: Icon(Icons.list),
+            label: 'Transaksionet',
           ),
         ],
-        currentIndex: _selectedIndex,
-        selectedItemColor: const Color.fromARGB(255, 19, 125, 5),
-        onTap: _onItemTapped,
       ),
     );
   }
 
   Widget _buildPieChartByType(String type) {
-    // Filtrimi i të dhënave sipas tipit (Income/Expense)
-    Map<String, double> categoryData = {};
+    final filtered =
+        _transactions.where((item) => item['type'] == type).toList();
 
-    for (var tx in _transactions) {
-      if (tx['type'] == type) {
-        String category = tx['category'];
-        categoryData[category] = (categoryData[category] ?? 0) + tx['amount'];
+    if (filtered.isEmpty) {
+      return const Center(child: Text('Nuk ka transaksione për këtë kategori'));
+    }
+
+    // Grupimi sipas kategorisë dhe llogaritja e shumës
+    Map<String, double> dataMap = {};
+    for (var item in filtered) {
+      final category = item['category'];
+      final amount = item['amount'] as double;
+      if (category == 'Kategoria') continue; // injoro kategorinë default
+
+      if (dataMap.containsKey(category)) {
+        dataMap[category] = dataMap[category]! + amount;
+      } else {
+        dataMap[category] = amount;
       }
     }
 
-    if (categoryData.isEmpty) {
-      return Center(child: Text('Nuk ka të dhëna për $type.'));
+    if (dataMap.isEmpty) {
+      return const Center(child: Text('Nuk ka transaksione për këtë kategori'));
     }
 
-    // Ngjyrat për kategori në grafik
-    final colors = [
-      const Color.fromARGB(255, 2, 86, 27),
-      Colors.green.shade400,
-      const Color.fromARGB(255, 255, 38, 96),
-      const Color.fromARGB(255, 170, 239, 80),
-      Colors.purple.shade400,
-      Colors.teal.shade400,
-    ];
-
-    // Ndërtimi i seksioneve për grafik
+    // Përgatit listën e seksioneve për grafik
     final List<PieChartSectionData> sections = [];
-    int colorIndex = 0;
-    categoryData.forEach((category, amount) {
-      final color = colors[colorIndex % colors.length];
+    final colors = [
+      Colors.blue,
+      Colors.green,
+      Colors.orange,
+      Colors.red,
+      Colors.purple,
+      Colors.brown,
+    ];
+    int i = 0;
+
+    dataMap.forEach((category, amount) {
       sections.add(
         PieChartSectionData(
-          color: color,
           value: amount,
-          title: category,
-          radius: 80,
+          color: colors[i % colors.length],
+          title: '${category}\n€${amount.toStringAsFixed(2)}',
+          radius: 60,
           titleStyle: const TextStyle(
-            fontSize: 14,
+            fontSize: 12,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
       );
-      colorIndex++;
+      i++;
     });
 
-    // Përmbledhje e të ardhurave dhe shpenzimeve sipas kategorive për gjithë transaksionet
-    Map<String, double> incomeByCategory = {};
-    Map<String, double> expenseByCategory = {};
-
-    for (var tx in _transactions) {
-      String category = tx['category'];
-      double amount = tx['amount'];
-
-      if (tx['type'] == 'Income') {
-        incomeByCategory[category] = (incomeByCategory[category] ?? 0) + amount;
-      } else {
-        expenseByCategory[category] =
-            (expenseByCategory[category] ?? 0) + amount;
-      }
-    }
-
-    // Filtrimi i transaksioneve për historikun sipas tipit të zgjedhur
-    List filteredTransactions =
-        _transactions.where((tx) => tx['type'] == type).toList();
-
-    return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            height: 250,
-            child: PieChart(
-              PieChartData(
-                sections: sections,
-                sectionsSpace: 4,
-                centerSpaceRadius: 40,
-                borderData: FlBorderData(show: false),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Historiku sipas Kategorisë:',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          filteredTransactions.isEmpty
-              ? const Text("Nuk ka transaksione për të shfaqur.")
-              : Column(
-                children:
-                    filteredTransactions.map((tx) {
-                      return ListTile(
-                        leading: Icon(
-                          _getCategoryIcon(tx['category']),
-                          color: Colors.blueGrey,
-                        ),
-                        title: Text(
-                          "${tx['category']} - €${tx['amount'].toStringAsFixed(2)}",
-                        ),
-                        subtitle: Text("${tx['description']} (${tx['type']})"),
-                        trailing: Text(
-                          "${tx['date'].day}/${tx['date'].month}/${tx['date'].year}",
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                      );
-                    }).toList(),
-              ),
-          const Divider(height: 30),
-        ],
+    return PieChart(
+      PieChartData(
+        sections: sections,
+        centerSpaceRadius: 40,
+        sectionsSpace: 2,
+        borderData: FlBorderData(show: false),
       ),
     );
-  }
-
-  // Funksioni për të marrë ikonën sipas kategorisë
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case 'Shkolle':
-        return Icons.school;
-      case 'Argetim':
-        return Icons.movie;
-      case 'Ushqim':
-        return Icons.fastfood;
-      case 'Transport':
-        return Icons.directions_car;
-      case 'Tjera':
-        return Icons.category;
-      default:
-        return Icons.help_outline;
-    }
   }
 }
