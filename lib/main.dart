@@ -344,67 +344,134 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
   }
 
   Widget _buildPieChartByType(String type) {
-    final filtered =
-        _transactions.where((item) => item['type'] == type).toList();
+    // Filtrimi i të dhënave sipas tipit (Income/Expense)
+    Map<String, double> categoryData = {};
 
-    if (filtered.isEmpty) {
-      return const Center(child: Text('Nuk ka transaksione për këtë kategori'));
-    }
-
-    // Grupimi sipas kategorisë dhe llogaritja e shumës
-    Map<String, double> dataMap = {};
-    for (var item in filtered) {
-      final category = item['category'];
-      final amount = item['amount'] as double;
-      if (category == 'Kategoria') continue; // injoro kategorinë default
-
-      if (dataMap.containsKey(category)) {
-        dataMap[category] = dataMap[category]! + amount;
-      } else {
-        dataMap[category] = amount;
+    for (var tx in _transactions) {
+      if (tx['type'] == type) {
+        String category = tx['category'];
+        categoryData[category] = (categoryData[category] ?? 0) + tx['amount'];
       }
     }
 
-    if (dataMap.isEmpty) {
-      return const Center(child: Text('Nuk ka transaksione për këtë kategori'));
+    if (categoryData.isEmpty) {
+      return Center(child: Text('Nuk ka të dhëna për $type.'));
     }
 
-    // Përgatit listën e seksioneve për grafik
-    final List<PieChartSectionData> sections = [];
+    // Ngjyrat për kategori në grafik
     final colors = [
-      Colors.blue,
-      Colors.green,
-      Colors.orange,
-      Colors.red,
-      Colors.purple,
-      Colors.brown,
+      const Color.fromARGB(255, 2, 86, 27),
+      Colors.green.shade400,
+      const Color.fromARGB(255, 255, 38, 96),
+      const Color.fromARGB(255, 170, 239, 80),
+      Colors.purple.shade400,
+      Colors.teal.shade400,
     ];
-    int i = 0;
 
-    dataMap.forEach((category, amount) {
+    // Ndërtimi i seksioneve për grafik
+    final List<PieChartSectionData> sections = [];
+    int colorIndex = 0;
+    categoryData.forEach((category, amount) {
+      final color = colors[colorIndex % colors.length];
       sections.add(
         PieChartSectionData(
+          color: color,
           value: amount,
-          color: colors[i % colors.length],
-          title: '${category}\n€${amount.toStringAsFixed(2)}',
-          radius: 60,
+          title: category,
+          radius: 80,
           titleStyle: const TextStyle(
-            fontSize: 12,
+            fontSize: 14,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
       );
-      i++;
+      colorIndex++;
     });
 
-    return PieChart(
-      PieChartData(
-        sections: sections,
-        centerSpaceRadius: 40,
-        sectionsSpace: 2,
-        borderData: FlBorderData(show: false),
+    // Përmbledhje e të ardhurave dhe shpenzimeve sipas kategorive për gjithë transaksionet
+    Map<String, double> incomeByCategory = {};
+    Map<String, double> expenseByCategory = {};
+
+    for (var tx in _transactions) {
+      String category = tx['category'];
+      double amount = tx['amount'];
+
+      if (tx['type'] == 'Income') {
+        incomeByCategory[category] = (incomeByCategory[category] ?? 0) + amount;
+      } else {
+        expenseByCategory[category] =
+            (expenseByCategory[category] ?? 0) + amount;
+      }
+    }
+
+    // Filtrimi i transaksioneve për historikun sipas tipit të zgjedhur
+    List filteredTransactions =
+        _transactions.where((tx) => tx['type'] == type).toList();
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 250,
+            child: PieChart(
+              PieChartData(
+                sections: sections,
+                sectionsSpace: 4,
+                centerSpaceRadius: 40,
+                borderData: FlBorderData(show: false),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Historiku sipas Kategorisë:',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 10),
+          filteredTransactions.isEmpty
+              ? const Text("Nuk ka transaksione për të shfaqur.")
+              : Column(
+                children:
+                    filteredTransactions.map((tx) {
+                      return ListTile(
+                        leading: Icon(
+                          _getCategoryIcon(tx['category']),
+                          color: Colors.blueGrey,
+                        ),
+                        title: Text(
+                          "${tx['category']} - €${tx['amount'].toStringAsFixed(2)}",
+                        ),
+                        subtitle: Text("${tx['description']} (${tx['type']})"),
+                        trailing: Text(
+                          "${tx['date'].day}/${tx['date'].month}/${tx['date'].year}",
+                          style: const TextStyle(fontSize: 12),
+                        ),
+                      );
+                    }).toList(),
+              ),
+          const Divider(height: 30),
+        ],
       ),
     );
+  }
+
+  // Funksioni për të marrë ikonën sipas kategorisë
+  IconData _getCategoryIcon(String category) {
+    switch (category) {
+      case 'Shkolle':
+        return Icons.school;
+      case 'Argetim':
+        return Icons.movie;
+      case 'Ushqim':
+        return Icons.fastfood;
+      case 'Transport':
+        return Icons.directions_car;
+      case 'Tjera':
+        return Icons.category;
+      default:
+        return Icons.help_outline;
+    }
   }
 }
