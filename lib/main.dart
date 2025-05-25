@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import './splash_screen.dart';
+import './main.dart';
 
 void main() {
   runApp(const MyApp());
@@ -14,12 +16,12 @@ class MyApp extends StatelessWidget {
       title: 'Kalkulatori i Buxhetit Personal',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
+          seedColor: const Color.fromARGB(255, 255, 255, 255),
           brightness: Brightness.light,
         ),
         useMaterial3: true,
       ),
-      home: const BudgetHomePage(),
+      home: const SplashScreen(),
     );
   }
 }
@@ -37,7 +39,7 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
   String _selectedType = 'Income';
   String _selectedCategory = 'Kategoria';
 
-  List<Map<String, dynamic>> _transactions = [];
+  final List<Map<String, dynamic>> _transactions = [];
 
   // Ky variabël përzgjedh se çfarë tipi do shfaqim në grafik (Income ose Expense)
   String _chartType = 'Income';
@@ -79,13 +81,13 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
 
   @override
   Widget build(BuildContext context) {
-    List<Widget> _pages = [
+    List<Widget> pages = [
       // Home Tab
       Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            Image.asset('images/1.png'),
+            Center(child: Image.asset('images/savings.png', height: 80)),
             const SizedBox(height: 16),
             Center(
               child: Text(
@@ -112,6 +114,7 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
               ],
             ),
             const Divider(height: 30),
+
             TextField(
               controller: _amountController,
               keyboardType: TextInputType.number,
@@ -189,7 +192,7 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
               },
               borderRadius: BorderRadius.circular(8),
               selectedColor: Colors.white,
-              fillColor: const Color.fromARGB(255, 11, 160, 171),
+              fillColor: const Color.fromARGB(255, 19, 125, 5),
               children: const [
                 Padding(
                   padding: EdgeInsets.symmetric(horizontal: 16),
@@ -228,11 +231,17 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
               ],
             ),
             const SizedBox(height: 16),
+
+            // 👇 Piggy Bank Image
+            Center(child: Image.asset('images/piggy_bank.png', height: 80)),
+
+            const SizedBox(height: 16),
             const Text(
               'Lista e Transaksioneve:',
               style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
             ),
             const SizedBox(height: 10),
+
             Expanded(
               child: ListView(
                 children:
@@ -262,7 +271,7 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Kalkulatori i Buxhetit Personal')),
-      body: _pages[_selectedIndex],
+      body: pages[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         items: const <BottomNavigationBarItem>[
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Home'),
@@ -276,7 +285,7 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
           ),
         ],
         currentIndex: _selectedIndex,
-        selectedItemColor: const Color.fromARGB(255, 11, 160, 171),
+        selectedItemColor: const Color.fromARGB(255, 19, 125, 5),
         onTap: _onItemTapped,
       ),
     );
@@ -299,10 +308,10 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
 
     // Ngjyrat për kategori në grafik
     final colors = [
-      Colors.blue.shade400,
+      const Color.fromARGB(255, 2, 86, 27),
       Colors.green.shade400,
       const Color.fromARGB(255, 255, 38, 96),
-      Colors.red.shade400,
+      const Color.fromARGB(255, 170, 239, 80),
       Colors.purple.shade400,
       Colors.teal.shade400,
     ];
@@ -391,44 +400,6 @@ class _BudgetHomePageState extends State<BudgetHomePage> {
                     }).toList(),
               ),
           const Divider(height: 30),
-          const Text(
-            'Përmbledhje sipas Kategorisë:',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Të ardhurat:',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          ...incomeByCategory.entries.map(
-            (entry) => Row(
-              children: [
-                Icon(_getCategoryIcon(entry.key), color: Colors.green),
-                const SizedBox(width: 8),
-                Text(
-                  "${entry.key}: €${entry.value.toStringAsFixed(2)}",
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 10),
-          const Text(
-            'Shpenzimet:',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
-          ),
-          ...expenseByCategory.entries.map(
-            (entry) => Row(
-              children: [
-                Icon(_getCategoryIcon(entry.key), color: Colors.red),
-                const SizedBox(width: 8),
-                Text(
-                  "${entry.key}: €${entry.value.toStringAsFixed(2)}",
-                  style: const TextStyle(fontSize: 14),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
